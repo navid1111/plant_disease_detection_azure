@@ -4,22 +4,40 @@ from keras import layers, models
 import matplotlib.pyplot as plt
 import argparse
 import os
+import shutil
+from kaggle.api.kaggle_api_extended import KaggleApi
 
 # --------------------------
 # Arguments for flexibility
 # --------------------------
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir", type=str, required=True, help="Path to dataset")
+parser.add_argument("--data_dir", type=str, default="PlantVillage", help="Path to dataset")
 parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
 parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
 parser.add_argument("--image_size", type=int, default=255, help="Image size")
-parser.add_argument("--output_model_path", type=str, default="model.keras", help="Where to save the trained model")
+parser.add_argument("--output_model_path", type=str, default="outputs/plant_model.keras", help="Where to save the trained model")
 args = parser.parse_args()
+
 
 BATCH_SIZE = args.batch_size
 IMAGE_SIZE = args.image_size
 CHANNELS = 3
 EPOCHS = args.epochs
+
+# --------------------------
+# Kaggle download logic
+# --------------------------
+if not os.path.exists(args.data_dir) or not os.listdir(args.data_dir):
+    print(f"Downloading PlantVillage dataset from Kaggle to {args.data_dir}...")
+    # Copy kaggle.json to ~/.kaggle
+    if os.path.exists("kaggle.json"):
+        os.makedirs(os.path.expanduser("~/.kaggle"), exist_ok=True)
+        shutil.copy("kaggle.json", os.path.expanduser("~/.kaggle/kaggle.json"))
+    api = KaggleApi()
+    api.authenticate()
+    api.dataset_download_files("arjunjoshua/plantdisease", path=args.data_dir, unzip=True)
+
 
 # --------------------------
 # Load dataset
@@ -107,6 +125,7 @@ history = model.fit(
 # --------------------------
 # Save the model
 # --------------------------
+
 os.makedirs(os.path.dirname(args.output_model_path), exist_ok=True)
 model.save(args.output_model_path)
 print(f"Model saved to {args.output_model_path}")
