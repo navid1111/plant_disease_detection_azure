@@ -1,6 +1,6 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
-code: https://github.com/navid1111/plant_disease_detection_azure.git
+code: .
 command: python train.py
 environment:
   conda_file: environment.yml
