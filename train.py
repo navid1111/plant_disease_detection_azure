@@ -1,0 +1,122 @@
+import tensorflow as tf
+from tensorflow import keras
+from keras import layers, models
+import matplotlib.pyplot as plt
+import argparse
+import os
+
+# --------------------------
+# Arguments for flexibility
+# --------------------------
+parser = argparse.ArgumentParser()
+parser.add_argument("--data_dir", type=str, required=True, help="Path to dataset")
+parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
+parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+parser.add_argument("--image_size", type=int, default=255, help="Image size")
+parser.add_argument("--output_model_path", type=str, default="model.keras", help="Where to save the trained model")
+args = parser.parse_args()
+
+BATCH_SIZE = args.batch_size
+IMAGE_SIZE = args.image_size
+CHANNELS = 3
+EPOCHS = args.epochs
+
+# --------------------------
+# Load dataset
+# --------------------------
+dataset = tf.keras.preprocessing.image_dataset_from_directory(
+    args.data_dir,
+    shuffle=True,
+    image_size=(IMAGE_SIZE, IMAGE_SIZE),
+    batch_size=BATCH_SIZE
+)
+
+class_names = dataset.class_names
+n_classes = len(class_names)
+
+# --------------------------
+# Dataset splitting
+# --------------------------
+def get_dataset_partitions_tf(ds, train_split=0.8, val_split=0.1, shuffle=True, shuffle_size=1000):
+    if shuffle:
+        ds = ds.shuffle(shuffle_size, seed=12)
+    ds_size = len(ds)
+    train_size = int(train_split * ds_size)
+    val_size = int(val_split * ds_size)
+    
+    train_ds = ds.take(train_size)
+    remaining = ds.skip(train_size)
+    val_ds = remaining.take(val_size)
+    test_ds = remaining.skip(val_size)
+    
+    return train_ds, val_ds, test_ds
+
+train_ds, validation_ds, test_ds = get_dataset_partitions_tf(dataset)
+
+# Optimize data pipeline
+train_ds = train_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+validation_ds = validation_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+test_ds = test_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+
+# --------------------------
+# Data preprocessing & augmentation
+# --------------------------
+resize_and_rescale = tf.keras.Sequential([
+    layers.Resizing(IMAGE_SIZE, IMAGE_SIZE),
+    layers.Rescaling(1./255)
+])
+
+data_augmentation = tf.keras.Sequential([
+    layers.RandomFlip("horizontal"),
+])
+
+# --------------------------
+# Model architecture
+# --------------------------
+model = models.Sequential([
+    resize_and_rescale,
+    data_augmentation,
+    layers.Conv2D(16, (3,3), activation='relu', input_shape=(IMAGE_SIZE, IMAGE_SIZE, CHANNELS)),
+    layers.MaxPooling2D((2,2)),
+    layers.Conv2D(32, (3,3), activation='relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Conv2D(32, (3,3), activation='relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Flatten(),
+    layers.Dense(32, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(n_classes, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+    metrics=['accuracy']
+)
+
+# --------------------------
+# Train the model
+# --------------------------
+history = model.fit(
+    train_ds,
+    epochs=EPOCHS,
+    batch_size=BATCH_SIZE,
+    validation_data=validation_ds
+)
+
+# --------------------------
+# Save the model
+# --------------------------
+os.makedirs(os.path.dirname(args.output_model_path), exist_ok=True)
+model.save(args.output_model_path)
+print(f"Model saved to {args.output_model_path}")
+
+# --------------------------
+# Optional: plot accuracy
+# --------------------------
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.plot(history.history['val_accuracy'], label='val_accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend(loc='lower right')
+plt.show()
