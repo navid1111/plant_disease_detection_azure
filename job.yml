@@ -1,22 +1,11 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
 code: https://github.com/navid1111/plant_disease_detection_azure.git
-command: >
-  python train.py
+command: python train.py
 environment:
-  name: plant-env
-  conda:
-    dependencies:
-      - python=3.10
-      - tensorflow
-      - keras
-      - matplotlib
-      - numpy
-      - kaggle
-      - pip:
-          - kaggle
-compute:
-  target: plant-compute
+  conda_file: environment.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+compute: plant-compute
 outputs:
   model_output:
     type: uri_folder

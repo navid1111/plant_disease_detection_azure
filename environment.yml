@@ -1,0 +1,12 @@
+name: plant-env
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - tensorflow
+  - keras
+  - matplotlib
+  - numpy
+  - pip
+  - pip:
+      - kaggle
