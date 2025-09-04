@@ -1,15 +1,53 @@
+# job.yml - CPU-Optimized for Available VM Families
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
+
+# Use local code path
 code: .
-command: python train.py
+
+# Optimized command for CPU training with multi-threading
+command: >-
+  python train.py
+  --use_multiprocessing True
+  --workers 8
+  --batch_size 32
+
+# CPU-optimized environment
 environment:
   conda_file: environment.yml
-  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+  image: mcr.microsoft.com/azureml/tensorflow-2.11-ubuntu20.04-py38-cpu
+
+# Environment variables for Kaggle
 environment_variables:
-  KAGGLE_USERNAME: ${{secret.KAGGLE_USERNAME}}
-  KAGGLE_KEY: ${{secret.KAGGLE_KEY}}
-compute: plant-compute
+  KAGGLE_USERNAME: ${{secrets.KAGGLE_USERNAME}}
+  KAGGLE_KEY: ${{secrets.KAGGLE_KEY}}
+  # CPU optimization settings
+  TF_CPP_MIN_LOG_LEVEL: "2"
+  OMP_NUM_THREADS: "8"
+  TF_NUM_INTEROP_THREADS: "2"
+  TF_NUM_INTRAOP_THREADS: "8"
+
+# Use the high-performance L8s_v2 cluster
+compute: plant-training-cluster
+
+# Resource configuration
+resources:
+  instance_count: 1
+
+# Output configuration
 outputs:
   model_output:
     type: uri_folder
     path: azureml://datastores/workspaceblobstore/paths/plant-model/
+
+# Job metadata
+display_name: plant-disease-detection-cpu-optimized
+experiment_name: plant-disease-detection
+description: CPU-optimized plant disease detection training (8 vCPUs, 64GB RAM)
+
+# Tags
+tags:
+  project: plant-disease-detection
+  framework: tensorflow
+  compute_type: cpu_optimized
+  vm_family: standardLSv2Family

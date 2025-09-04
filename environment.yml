@@ -1,12 +1,24 @@
+# environment.yml - CPU-Optimized for Plant Disease Detection
 name: plant-env
 channels:
+  - conda-forge
   - defaults
 dependencies:
-  - python=3.10
-  - tensorflow
+  - python=3.8
+  - tensorflow-cpu=2.11
   - keras
-  - matplotlib
   - numpy
+  - matplotlib
+  - pillow
+  - scikit-learn
+  - pandas
+  - seaborn
   - pip
   - pip:
-      - kaggle
+    - kaggle
+    - opencv-python-headless
+    - tensorflow-addons
+    - imgaug
+    - albumentations
+    # CPU optimization libraries
+    - intel-tensorflow  # If available, provides CPU optimizations
