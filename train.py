@@ -27,6 +27,11 @@ IMAGE_SIZE = args.image_size
 CHANNELS = 3
 EPOCHS = args.epochs
 
+# --------------------------
+# Kaggle dataset settings
+# --------------------------
+DATASET_SLUG = "abdallahalidev/plantvillage-dataset"  # Updated dataset slug
+
 def ensure_kaggle_credentials():
     """Ensure kaggle.json exists either from local file or env vars.
     Exit with clear message if not available."""
@@ -68,14 +73,23 @@ def download_dataset_if_needed():
     except Exception as e:
         print(f"Failed to authenticate with Kaggle API: {e}", file=sys.stderr)
         sys.exit(1)
+    # Preflight: try listing files to surface license / permission issues early
     try:
-        api.dataset_download_files("arjunjoshua/plantdisease", path=args.data_dir, unzip=True)
+        files = api.dataset_list_files(DATASET_SLUG)
+        print(f"Dataset '{DATASET_SLUG}' file count: {len(files.files)}")
+    except Exception as e:
+        print(f"Preflight list failed for dataset '{DATASET_SLUG}': {e}", file=sys.stderr)
+        print("If 403: ensure you have accepted the dataset license in the Kaggle UI.", file=sys.stderr)
+        sys.exit(1)
+    try:
+        api.dataset_download_files(DATASET_SLUG, path=args.data_dir, unzip=True)
     except Exception as e:
         print(f"Failed to download dataset: {e}", file=sys.stderr)
         print("Troubleshooting steps:\n"
               " 1. Verify KAGGLE_USERNAME / KAGGLE_KEY (regenerate key if needed).\n"
-              " 2. Ensure you accepted the dataset license in the Kaggle UI.\n"
-              " 3. Check network egress / firewall in Azure ML compute.\n", file=sys.stderr)
+              " 2. Ensure you accepted the dataset license for this dataset in the Kaggle UI.\n"
+              " 3. Check network egress / firewall in Azure ML compute.\n"
+              f" 4. Confirm dataset slug '{DATASET_SLUG}' is correct.\n", file=sys.stderr)
         sys.exit(1)
 
 
