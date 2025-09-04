@@ -1,19 +1,14 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
 code: .
-command: >
-  python train.py --dataset_slug emmarex/plantdisease --auto_fix_single_class \
-  --batch_size 4 --image_size 128 --epochs 5 --shuffle_buffer 64 --cache_to_disk \
-  --max_train_batches 150 --conservative
+command: python train.py
 environment:
   conda_file: environment.yml
   image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
 environment_variables:
   KAGGLE_USERNAME: ${{secret.KAGGLE_USERNAME}}
   KAGGLE_KEY: ${{secret.KAGGLE_KEY}}
-compute: b1s-cluster
-display_name: plant-disease-train-b1s
-experiment_name: plant-disease-exp
+compute: plant-compute
 outputs:
   model_output:
     type: uri_folder
