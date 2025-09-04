@@ -5,7 +5,9 @@ command: >
   python train.py --dataset_slug emmarex/plantdisease --auto_fix_single_class \
   --batch_size 4 --image_size 128 --epochs 5 --shuffle_buffer 64 --cache_to_disk \
   --max_train_batches 150 --conservative
-environment: azureml:AzureML-TensorFlow-2.15-CPU:latest
+environment:
+  conda_file: environment.yml
+  image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
 environment_variables:
   KAGGLE_USERNAME: ${{secret.KAGGLE_USERNAME}}
   KAGGLE_KEY: ${{secret.KAGGLE_KEY}}
