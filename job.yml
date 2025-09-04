@@ -1,13 +1,16 @@
 $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 type: command
 code: .
-command: python train.py --dataset_slug emmarex/plantdisease --auto_fix_single_class --batch_size 8 --image_size 128 --epochs 20 --shuffle_buffer 128 --cache_to_disk
-environment: azureml:AzureML-TensorFlow-2.15-GPU:latest
+command: >
+  python train.py --dataset_slug emmarex/plantdisease --auto_fix_single_class \
+  --batch_size 4 --image_size 128 --epochs 5 --shuffle_buffer 64 --cache_to_disk \
+  --max_train_batches 150 --conservative
+environment: azureml:AzureML-TensorFlow-2.15-CPU:latest
 environment_variables:
   KAGGLE_USERNAME: ${{secret.KAGGLE_USERNAME}}
   KAGGLE_KEY: ${{secret.KAGGLE_KEY}}
-compute: gpu-cluster
-display_name: plant-disease-train
+compute: b1s-cluster
+display_name: plant-disease-train-b1s
 experiment_name: plant-disease-exp
 outputs:
   model_output:
