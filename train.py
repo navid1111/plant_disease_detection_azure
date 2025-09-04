@@ -23,6 +23,7 @@ parser.add_argument("--shuffle_buffer", type=int, default=200, help="Shuffle buf
 parser.add_argument("--max_train_batches", type=int, default=None, help="Optional cap on number of training batches (after split)")
 parser.add_argument("--cache_to_disk", action="store_true", help="Cache datasets to local disk instead of memory")
 parser.add_argument("--auto_fix_single_class", action="store_true", help="Attempt to descend one directory level if only 1 class detected")
+parser.add_argument("--dataset_slug", type=str, default="emmarex/plantdisease", help="Kaggle dataset slug (owner/dataset)")
 args = parser.parse_args()
 
 
@@ -34,7 +35,7 @@ EPOCHS = args.epochs
 # --------------------------
 # Kaggle dataset settings
 # --------------------------
-DATASET_SLUG = "abdallahalidev/plantvillage-dataset"  # Updated dataset slug
+DATASET_SLUG = args.dataset_slug  # Now configurable via CLI
 
 def ensure_kaggle_credentials():
     """Ensure kaggle.json exists either from local file or env vars.
