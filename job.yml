@@ -6,8 +6,8 @@ environment:
   conda_file: environment.yml
   image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
 environment_variables:
-  KAGGLE_USERNAME: 'babykamal'
-  KAGGLE_KEY: 'af2586b0814009995ca92c044bb6d672'
+  KAGGLE_USERNAME: ${{secret.KAGGLE_USERNAME}}
+  KAGGLE_KEY: ${{secret.KAGGLE_KEY}}
 compute: plant-compute
 outputs:
   model_output:

@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 import shutil
+import json
+import sys
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 # --------------------------
@@ -25,18 +27,60 @@ IMAGE_SIZE = args.image_size
 CHANNELS = 3
 EPOCHS = args.epochs
 
-# --------------------------
-# Kaggle download logic
-# --------------------------
-if not os.path.exists(args.data_dir) or not os.listdir(args.data_dir):
-    print(f"Downloading PlantVillage dataset from Kaggle to {args.data_dir}...")
-    # Copy kaggle.json to ~/.kaggle
+def ensure_kaggle_credentials():
+    """Ensure kaggle.json exists either from local file or env vars.
+    Exit with clear message if not available."""
+    kaggle_home = os.path.expanduser("~/.kaggle")
+    cred_path = os.path.join(kaggle_home, "kaggle.json")
+    os.makedirs(kaggle_home, exist_ok=True)
+
+    if os.path.exists(cred_path):
+        return cred_path
+
     if os.path.exists("kaggle.json"):
-        os.makedirs(os.path.expanduser("~/.kaggle"), exist_ok=True)
-        shutil.copy("kaggle.json", os.path.expanduser("~/.kaggle/kaggle.json"))
+        shutil.copy("kaggle.json", cred_path)
+    else:
+        ku = os.environ.get("KAGGLE_USERNAME")
+        kk = os.environ.get("KAGGLE_KEY")
+        if ku and kk:
+            with open(cred_path, "w") as f:
+                json.dump({"username": ku, "key": kk}, f)
+        else:
+            print("ERROR: Kaggle credentials not found. Provide kaggle.json or set KAGGLE_USERNAME & KAGGLE_KEY.", file=sys.stderr)
+            sys.exit(1)
+    # Set restrictive permissions (best effort)
+    try:
+        os.chmod(cred_path, 0o600)
+    except Exception:
+        pass
+    return cred_path
+
+
+def download_dataset_if_needed():
+    if os.path.exists(args.data_dir) and os.listdir(args.data_dir):
+        print(f"Dataset directory '{args.data_dir}' already populated. Skipping download.")
+        return
+    print(f"Preparing to download PlantVillage dataset into '{args.data_dir}'...")
+    ensure_kaggle_credentials()
     api = KaggleApi()
-    api.authenticate()
-    api.dataset_download_files("arjunjoshua/plantdisease", path=args.data_dir, unzip=True)
+    try:
+        api.authenticate()
+    except Exception as e:
+        print(f"Failed to authenticate with Kaggle API: {e}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        api.dataset_download_files("arjunjoshua/plantdisease", path=args.data_dir, unzip=True)
+    except Exception as e:
+        print(f"Failed to download dataset: {e}", file=sys.stderr)
+        print("Troubleshooting steps:\n"
+              " 1. Verify KAGGLE_USERNAME / KAGGLE_KEY (regenerate key if needed).\n"
+              " 2. Ensure you accepted the dataset license in the Kaggle UI.\n"
+              " 3. Check network egress / firewall in Azure ML compute.\n", file=sys.stderr)
+        sys.exit(1)
+
+
+# Trigger dataset download if needed
+download_dataset_if_needed()
 
 
 # --------------------------
