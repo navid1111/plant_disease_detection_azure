@@ -16,6 +16,7 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", type=str, default="PlantVillage", help="Path to dataset")
 parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
+parser.add_argument("--conservative", action="store_true", help="Enable smaller model & fewer epochs for low-memory runs")
 parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
 parser.add_argument("--image_size", type=int, default=255, help="Image size")
 parser.add_argument("--output_model_path", type=str, default="outputs/plant_model.keras", help="Where to save the trained model")
@@ -30,7 +31,7 @@ args = parser.parse_args()
 BATCH_SIZE = args.batch_size
 IMAGE_SIZE = args.image_size
 CHANNELS = 3
-EPOCHS = args.epochs
+EPOCHS = args.epochs if not args.conservative else min(10, args.epochs)
 
 # --------------------------
 # Kaggle dataset settings
@@ -133,6 +134,16 @@ dataset = tf.keras.preprocessing.image_dataset_from_directory(
 class_names = dataset.class_names
 n_classes = len(class_names)
 
+# Early guard for incorrect dataset root / single class
+if n_classes < 2:
+    print("ERROR: Only one class detected in dataset. This usually means the directory structure is off.", file=sys.stderr)
+    print("Hints:\n"
+        " - Ensure directory structure is <root>/<class_name>/*.jpg\n"
+        " - Try --auto_fix_single_class if there's an extra nesting level.\n"
+        f" - Current data_dir resolved to: {data_dir}\n"
+        f" - Classes found: {class_names}", file=sys.stderr)
+    sys.exit(1)
+
 # --------------------------
 # Dataset splitting
 # --------------------------
@@ -187,18 +198,20 @@ data_augmentation = tf.keras.Sequential([
 # --------------------------
 # Model architecture
 # --------------------------
+base_filters = 16 if not args.conservative else 8
 model = models.Sequential([
+    keras.Input(shape=(IMAGE_SIZE, IMAGE_SIZE, CHANNELS)),
     resize_and_rescale,
     data_augmentation,
-    layers.Conv2D(16, (3,3), activation='relu', input_shape=(IMAGE_SIZE, IMAGE_SIZE, CHANNELS)),
+    layers.Conv2D(base_filters, (3,3), activation='relu'),
     layers.MaxPooling2D((2,2)),
-    layers.Conv2D(32, (3,3), activation='relu'),
+    layers.Conv2D(base_filters*2, (3,3), activation='relu'),
     layers.MaxPooling2D((2,2)),
-    layers.Conv2D(32, (3,3), activation='relu'),
+    layers.Conv2D(base_filters*2, (3,3), activation='relu'),
     layers.MaxPooling2D((2,2)),
     layers.Flatten(),
-    layers.Dense(32, activation='relu'),
-    layers.Dropout(0.5),
+    layers.Dense(32 if not args.conservative else 16, activation='relu'),
+    layers.Dropout(0.5 if not args.conservative else 0.3),
     layers.Dense(n_classes, activation='softmax')
 ])
 
@@ -215,7 +228,8 @@ history = model.fit(
     train_ds,
     epochs=EPOCHS,
     batch_size=BATCH_SIZE,
-    validation_data=validation_ds
+    validation_data=validation_ds,
+    verbose=1
 )
 
 # --------------------------
