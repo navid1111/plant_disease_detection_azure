@@ -19,6 +19,10 @@ parser.add_argument("--epochs", type=int, default=50, help="Number of training e
 parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
 parser.add_argument("--image_size", type=int, default=255, help="Image size")
 parser.add_argument("--output_model_path", type=str, default="outputs/plant_model.keras", help="Where to save the trained model")
+parser.add_argument("--shuffle_buffer", type=int, default=200, help="Shuffle buffer (in batches) to avoid OOM")
+parser.add_argument("--max_train_batches", type=int, default=None, help="Optional cap on number of training batches (after split)")
+parser.add_argument("--cache_to_disk", action="store_true", help="Cache datasets to local disk instead of memory")
+parser.add_argument("--auto_fix_single_class", action="store_true", help="Attempt to descend one directory level if only 1 class detected")
 args = parser.parse_args()
 
 
@@ -96,12 +100,30 @@ def download_dataset_if_needed():
 # Trigger dataset download if needed
 download_dataset_if_needed()
 
+# --------------------------
+# Helper: attempt single-class fix
+# --------------------------
+def attempt_single_class_fix(base_dir: str):
+    if not args.auto_fix_single_class:
+        return base_dir
+    subdirs = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+    # If there is exactly one subdir, and inside it there are multiple dirs, go one level deeper
+    if len(subdirs) == 1:
+        inner = os.path.join(base_dir, subdirs[0])
+        inner_subdirs = [d for d in os.listdir(inner) if os.path.isdir(os.path.join(inner, d))]
+        if len(inner_subdirs) > 1:
+            print(f"Single top-level class detected; descending into '{inner}' to use {len(inner_subdirs)} classes.")
+            return inner
+    return base_dir
+
+data_dir = attempt_single_class_fix(args.data_dir)
+
 
 # --------------------------
 # Load dataset
 # --------------------------
 dataset = tf.keras.preprocessing.image_dataset_from_directory(
-    args.data_dir,
+    data_dir,
     shuffle=True,
     image_size=(IMAGE_SIZE, IMAGE_SIZE),
     batch_size=BATCH_SIZE
@@ -129,10 +151,25 @@ def get_dataset_partitions_tf(ds, train_split=0.8, val_split=0.1, shuffle=True, 
 
 train_ds, validation_ds, test_ds = get_dataset_partitions_tf(dataset)
 
+# Optional subsample to limit memory/time
+if args.max_train_batches is not None:
+    train_ds = train_ds.take(args.max_train_batches)
+
 # Optimize data pipeline
-train_ds = train_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
-validation_ds = validation_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
-test_ds = test_ds.shuffle(1000).prefetch(buffer_size=tf.data.AUTOTUNE)
+shuffle_buf = max(1, min(args.shuffle_buffer, len(train_ds)))
+train_ds = train_ds.shuffle(shuffle_buf)
+validation_ds = validation_ds.shuffle(min(shuffle_buf, len(validation_ds)))
+test_ds = test_ds.shuffle(min(shuffle_buf, len(test_ds)))
+
+if args.cache_to_disk:
+    # Cache to disk to avoid storing full dataset in RAM
+    train_ds = train_ds.cache("cache_train")
+    validation_ds = validation_ds.cache("cache_val")
+    test_ds = test_ds.cache("cache_test")
+
+train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+validation_ds = validation_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
+test_ds = test_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
 
 # --------------------------
 # Data preprocessing & augmentation
